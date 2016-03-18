@@ -44,6 +44,8 @@ int main(int argc, char** argv)
     emojis.push_back(line);
   }
   
+  emojifile.close();
+  
   for (;;)
   {
     std::cout << "Generating tweet" << std::endl;
@@ -66,14 +68,22 @@ int main(int argc, char** argv)
     
     std::string emojibef;
     std::string emojiaft;
+    int emn = 0;
     do
     {
+      emn++;
       std::string em = emojis[rand() % emojis.size()];
       emojibef += em;
       emojiaft = em + emojiaft;
-    } while (rand() % 4 < 3);
+    } while (rand() % 2 == 0);
     
-    std::string result = emojibef + " " + exclamation + " " + emojiaft;
+    std::string result;
+    if (emn > 3)
+    {
+      result = emojibef + "\n" + exclamation + "\n" + emojiaft;
+    } else {
+      result = emojibef + " " + exclamation + " " + emojiaft;
+    }
     result.resize(140);
     
     std::string replyMsg;
