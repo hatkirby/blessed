@@ -5,6 +5,7 @@
 #include <sstream>
 #include <twitcurl.h>
 #include <verbly.h>
+#include <unistd.h>
 
 int main(int argc, char** argv)
 {
@@ -53,8 +54,8 @@ int main(int argc, char** argv)
     std::string exclamation;
     for (;;)
     {
-      verbly::verb v = database.verbs().random(true).limit(1).has_pronunciation(true).run().front();
-      auto rhyms = database.nouns().rhymes_with(v).random(true).limit(1).not_derived_from(v).is_not_proper(true).run();
+      verbly::verb v = database.verbs().random().limit(1).has_pronunciation().run().front();
+      auto rhyms = database.nouns().rhymes_with(v).random().limit(1).is_not_proper().run();
       if (!rhyms.empty())
       {
         auto n = rhyms.front();
