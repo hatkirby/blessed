@@ -1,58 +1,60 @@
 #include <yaml-cpp/yaml.h>
 #include <iostream>
-#include <cstdlib>
-#include <ctime>
 #include <sstream>
-#include <twitcurl.h>
+#include <fstream>
 #include <verbly.h>
-#include <unistd.h>
+#include <twitter.h>
+#include <chrono>
+#include <random>
+#include <thread>
 
 int main(int argc, char** argv)
 {
-  srand(time(NULL));
+  std::random_device random_device;
+  std::mt19937 random_engine{random_device()};
   
   YAML::Node config = YAML::LoadFile("config.yml");
     
-  twitCurl twitter;
-  twitter.getOAuth().setConsumerKey(config["consumer_key"].as<std::string>());
-  twitter.getOAuth().setConsumerSecret(config["consumer_secret"].as<std::string>());
-  twitter.getOAuth().setOAuthTokenKey(config["access_key"].as<std::string>());
-  twitter.getOAuth().setOAuthTokenSecret(config["access_secret"].as<std::string>());
+  twitter::auth auth;
+  auth.setConsumerKey(config["consumer_key"].as<std::string>());
+  auth.setConsumerSecret(config["consumer_secret"].as<std::string>());
+  auth.setAccessKey(config["access_key"].as<std::string>());
+  auth.setAccessSecret(config["access_secret"].as<std::string>());
+  
+  twitter::client client(auth);
   
   verbly::data database {"data.sqlite3"};
   
   std::vector<std::string> emojis;
-  std::ifstream emojifile("emojis.txt");
-  if (!emojifile.is_open())
   {
-    std::cout << "Could not find emoji." << std::endl;
-    return -1;
-  }
+    std::ifstream emojifile("emojis.txt");
+    if (!emojifile.is_open())
+    {
+      std::cout << "Could not find emoji." << std::endl;
+      return -1;
+    }
 
-  for (;;)
-  {
     std::string line;
-    if (!getline(emojifile, line))
+    while (getline(emojifile, line))
     {
-      break;
-    }
-  
-    if (line.back() == '\r')
-    {
-      line.pop_back();
-    }
+      if (line.back() == '\r')
+      {
+        line.pop_back();
+      }
     
-    emojis.push_back(line);
+      emojis.push_back(line);
+    }
   }
   
-  emojifile.close();
+  std::uniform_int_distribution<int> emojidist(0, emojis.size()-1);
+  std::bernoulli_distribution continuedist(1.0/2.0);
   
   for (;;)
   {
-    std::cout << "Generating tweet" << std::endl;
+    std::cout << "Generating tweet..." << std::endl;
     
     std::string exclamation;
-    for (;;)
+    while (exclamation.empty())
     {
       verbly::verb v = database.verbs().random().limit(1).has_pronunciation().run().front();
       auto rhyms = database.nouns().rhymes_with(v).random().limit(1).is_not_proper().run();
@@ -62,7 +64,6 @@ int main(int argc, char** argv)
         if (n.base_form() != v.base_form())
         {
           exclamation = "god " + v.base_form() + " this " + n.base_form();
-          break;
         }
       }
     }
@@ -73,10 +74,10 @@ int main(int argc, char** argv)
     do
     {
       emn++;
-      std::string em = emojis[rand() % emojis.size()];
+      std::string em = emojis[emojidist(random_engine)];
       emojibef += em;
       emojiaft = em + emojiaft;
-    } while (rand() % 2 == 0);
+    } while (continuedist(random_engine));
     
     std::string result;
     if (emn > 3)
@@ -85,19 +86,22 @@ int main(int argc, char** argv)
     } else {
       result = emojibef + " " + exclamation + " " + emojiaft;
     }
-    result.resize(140);
     
-    std::string replyMsg;
-    if (twitter.statusUpdate(result))
+    result.resize(140);
+    std::cout << result << std::endl;
+    
+    try
     {
-      twitter.getLastWebResponse(replyMsg);
-      std::cout << "Twitter message: " << replyMsg << std::endl;
-    } else {
-      twitter.getLastCurlError(replyMsg);
-      std::cout << "Curl error: " << replyMsg << std::endl;
+      client.updateStatus(result);
+      
+      std::cout << "Tweeted!" << std::endl;
+    } catch (const twitter::twitter_error& e)
+    {
+      std::cout << "Twitter error: " << e.what() << std::endl;
     }
     
-    std::cout << "Waiting" << std::endl;
-    sleep(60 * 60);
+    std::cout << "Waiting..." << std::endl;
+    
+    std::this_thread::sleep_for(std::chrono::hours(1));
   }
 }
