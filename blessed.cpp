@@ -10,10 +10,18 @@
 
 int main(int argc, char** argv)
 {
+  if (argc != 2)
+  {
+    std::cout << "usage: blessed [configfile]" << std::endl;
+    return -1;
+  }
+
+  std::string configfile(argv[1]);
+
   std::random_device random_device;
   std::mt19937 random_engine{random_device()};
   
-  YAML::Node config = YAML::LoadFile("config.yml");
+  YAML::Node config = YAML::LoadFile(configfile);
     
   twitter::auth auth;
   auth.setConsumerKey(config["consumer_key"].as<std::string>());
@@ -23,11 +31,11 @@ int main(int argc, char** argv)
   
   twitter::client client(auth);
   
-  verbly::data database {"data.sqlite3"};
+  verbly::data database {config["verbly_datafile"].as<std::string>()};
   
   std::vector<std::string> emojis;
   {
-    std::ifstream emojifile("emojis.txt");
+    std::ifstream emojifile(config["emoji_file"].as<std::string>());
     if (!emojifile.is_open())
     {
       std::cout << "Could not find emoji." << std::endl;
