@@ -57,24 +57,30 @@ int main(int argc, char** argv)
   std::uniform_int_distribution<int> emojidist(0, emojis.size()-1);
   std::bernoulli_distribution continuedist(1.0/2.0);
 
-  verbly::query<verbly::form> verbQuery = database.forms(
+  verbly::filter nounFilter =
+    (verbly::notion::partOfSpeech == verbly::part_of_speech::noun)
+    && (verbly::form::proper == false)
+    // Blacklist ethnic slurs
+    && !(verbly::word::usageDomains %= (verbly::notion::wnid == 106718862));
+
+  verbly::query<verbly::word> verbQuery = database.words(
     (verbly::notion::partOfSpeech == verbly::part_of_speech::verb)
-    && (verbly::pronunciation::rhymes));
+    && (verbly::pronunciation::rhymes %= nounFilter));
 
   for (;;)
   {
     std::cout << "Generating tweet..." << std::endl;
 
-    verbly::form verb = verbQuery.first();
+    verbly::word verb = verbQuery.first();
 
-    verbly::form noun = database.forms(
-      (verbly::notion::partOfSpeech == verbly::part_of_speech::noun)
-      && (verbly::pronunciation::rhymes %= verb)
-      && (verbly::form::proper == false)
-      && (verbly::form::id != verb.getId())
-      && !(verbly::word::usageDomains %= (verbly::notion::wnid == 106718862))).first();
+    verbly::word noun = database.words(
+      (verbly::pronunciation::rhymes %= verb)
+      && nounFilter).first();
 
-    std::string exclamation = "god " + verb.getText() + " this " + noun.getText();
+    verbly::token utter;
+    utter << "god" << verb << "this" << noun;
+
+    std::string exclamation = utter.compile();
 
     std::string emojibef;
     std::string emojiaft;
