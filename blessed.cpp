@@ -57,15 +57,20 @@ int main(int argc, char** argv)
   std::uniform_int_distribution<int> emojidist(0, emojis.size()-1);
   std::bernoulli_distribution continuedist(1.0/2.0);
 
+  verbly::filter slurFilter =
+    (verbly::word::usageDomains %= (verbly::notion::wnid == 106717170));
+
   verbly::filter nounFilter =
     (verbly::notion::partOfSpeech == verbly::part_of_speech::noun)
     && (verbly::form::proper == false)
-    // Blacklist ethnic slurs
-    && !(verbly::word::usageDomains %= (verbly::notion::wnid == 106718862));
+    // Blacklist slurs and slur homographys
+    && !(verbly::word::forms(verbly::inflection::base) %= slurFilter);;
 
   verbly::query<verbly::word> verbQuery = database.words(
     (verbly::notion::partOfSpeech == verbly::part_of_speech::verb)
-    && (verbly::pronunciation::rhymes %= nounFilter));
+    && (verbly::pronunciation::rhymes %= nounFilter)
+    // Blacklist slurs and slur homographys
+    && !(verbly::word::forms(verbly::inflection::base) %= slurFilter));
 
   for (;;)
   {
